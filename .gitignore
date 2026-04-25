@@ -3,3 +3,21 @@
 *.parquet
 __pycache__/
 .streamlit/secrets.toml
+
+# Environment files
+.env
+.env.*
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
