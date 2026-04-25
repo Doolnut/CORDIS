@@ -76,4 +76,30 @@ with tab4:
     render_network(conn, filters)
 
 with tab5:
-    st.info("Coming soon")
+    from src.data.queries import run_raw_sql
+    st.subheader("Raw SQL Query")
+    st.caption("Tables: project, organization, euro_sci_voc, topics, legal_basis, policy_priorities, web_link")
+    sql_input = st.text_area(
+        "SQL",
+        value=(
+            "SELECT name, country, COUNT(DISTINCT projectID) AS projects\n"
+            "FROM organization\n"
+            "WHERE activityType = 'PRC'\n"
+            "GROUP BY name, country\n"
+            "ORDER BY projects DESC\n"
+            "LIMIT 25"
+        ),
+        height=200,
+    )
+    if st.button("Run Query"):
+        try:
+            result_df = run_raw_sql(conn, sql_input)
+            st.dataframe(result_df, use_container_width=True, hide_index=True)
+            st.download_button(
+                "Export query results as CSV",
+                data=df_to_csv_bytes(result_df),
+                file_name="cordis_query_results.csv",
+                mime="text/csv",
+            )
+        except Exception as e:
+            st.error(f"Query error: {e}")
