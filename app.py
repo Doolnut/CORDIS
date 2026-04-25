@@ -64,13 +64,16 @@ with tab1:
         )
 
 with tab2:
-    st.info("Coming soon")
+    from src.ui.charts import render_bar_chart
+    render_bar_chart(conn, filters)
 
 with tab3:
-    st.info("Coming soon")
+    from src.ui.map_view import render_map
+    render_map(conn, filters)
 
 with tab4:
-    st.info("Coming soon")
+    from src.ui.network import render_network
+    render_network(conn, filters)
 
 with tab5:
     st.info("Coming soon")
