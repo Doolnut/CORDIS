@@ -18,14 +18,14 @@ def build_co_participation_edges(
 
     edges = conn.execute(f"""
         SELECT
-            a.name AS org_a,
-            b.name AS org_b,
-            COUNT(DISTINCT a.projectID) AS shared_projects
+            a._name AS org_a,
+            b._name AS org_b,
+            COUNT(DISTINCT a.projectid) AS shared_projects
         FROM organization a
-        JOIN organization b ON a.projectID = b.projectID AND a.name < b.name
-        WHERE a.name IN ({placeholders})
-          AND b.name IN ({placeholders})
-        GROUP BY a.name, b.name
+        JOIN organization b ON a.projectid = b.projectid AND a._name < b._name
+        WHERE a._name IN ({placeholders})
+          AND b._name IN ({placeholders})
+        GROUP BY a._name, b._name
         HAVING shared_projects >= {int(min_shared)}
         ORDER BY shared_projects DESC
     """).df()
@@ -64,11 +64,33 @@ def build_network_html(
 
     net.set_options("""
     {
-      "physics": {"enabled": true, "solver": "barnesHut"},
-      "interaction": {"hover": true, "tooltipDelay": 100}
+      "physics": {
+        "enabled": true,
+        "solver": "repulsion",
+        "repulsion": {"nodeDistance": 200, "springLength": 150, "damping": 0.9},
+        "stabilization": {"enabled": true, "iterations": 200, "fit": true},
+        "minVelocity": 0.5
+      },
+      "interaction": {"hover": true, "tooltipDelay": 100, "zoomView": true}
     }
     """)
-    return net.generate_html()
+    html = net.generate_html()
+    freeze_js = """
+    <script>
+    window.addEventListener('load', function () {
+      var check = setInterval(function () {
+        if (typeof network !== 'undefined') {
+          clearInterval(check);
+          network.on('stabilizationIterationsDone', function () {
+            network.setOptions({ physics: { enabled: false } });
+            network.fit();
+          });
+        }
+      }, 100);
+    });
+    </script>
+    """
+    return html.replace("</body>", freeze_js + "</body>")
 
 
 def render_network(conn: duckdb.DuckDBPyConnection, filters: dict) -> None:

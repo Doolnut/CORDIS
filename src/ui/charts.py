@@ -18,6 +18,7 @@ def build_top_companies_chart(df: pd.DataFrame, metric: str):
         y="name",
         orientation="h",
         color="country",
+        custom_data=["organisationid"],
         title=f"Top 25 Organisations by {METRIC_LABELS[metric]}",
         labels={"name": "Organisation", metric: METRIC_LABELS[metric]},
         height=700,
@@ -41,4 +42,9 @@ def render_bar_chart(conn: duckdb.DuckDBPyConnection, filters: dict) -> None:
         return
 
     fig = build_top_companies_chart(df, metric)
-    st.plotly_chart(fig, use_container_width=True)
+    st.caption("Click a bar to inspect an organisation.")
+    event = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="bar_chart")
+    if event.selection.points:
+        org_id = event.selection.points[0]["customdata"][0]
+        st.session_state["selected_org_id"] = org_id
+        st.session_state["selected_project_id"] = None

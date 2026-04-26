@@ -13,7 +13,6 @@ COLUMN_RENAME = {
     "project_count": "Projects",
     "total_ec_contribution": "EC Contribution (EUR)",
     "organizationURL": "Website",
-    "contactForm": "Contact",
 }
 
 
@@ -42,12 +41,21 @@ def render_results_table(conn: duckdb.DuckDBPyConnection, filters: dict) -> pd.D
     available = [c for c in display_cols if c in df.columns]
     formatted = format_org_table(df[available])
 
-    st.dataframe(
+    st.caption("Click a row to inspect an organisation.")
+    event = st.dataframe(
         formatted,
         use_container_width=True,
         hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="org_table",
         column_config={
             "Website": st.column_config.LinkColumn("Website"),
         },
     )
+    if event.selection.rows:
+        idx = event.selection.rows[0]
+        st.session_state["selected_org_id"] = df.iloc[idx]["organisationid"]
+        st.session_state["selected_project_id"] = None
+
     return df

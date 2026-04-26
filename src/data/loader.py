@@ -44,5 +44,5 @@ def _create_views(conn: duckdb.DuckDBPyConnection, data_path: Path) -> None:
         file_path = str(data_path / filename).replace("\\", "/")
         conn.execute(
             f"CREATE VIEW {view_name} AS "
-            f"SELECT * FROM read_csv_auto('{file_path}', delim=';', header=true, ignore_errors=true)"
+            f"SELECT * FROM read_csv_auto('{file_path}', delim=';', header=true, ignore_errors=true, normalize_names=true)"
         )

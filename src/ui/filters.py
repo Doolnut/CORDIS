@@ -19,6 +19,7 @@ def build_filters_dict(
     project_status: list[str],
     frameworks: list[str],
     policy_priorities: list[str],
+    top_n: int | None,
 ) -> dict:
     return {
         "search": search or None,
@@ -28,6 +29,7 @@ def build_filters_dict(
         "project_status": project_status or None,
         "frameworks": frameworks or None,
         "policy_priorities": policy_priorities or None,
+        "top_n": top_n,
     }
 
 
@@ -75,7 +77,18 @@ def render_filters(conn: duckdb.DuckDBPyConnection) -> dict:
         default=[],
     )
 
+    st.divider()
+    top_n = st.number_input(
+        "Max results (by project count)",
+        min_value=10,
+        max_value=10000,
+        value=500,
+        step=50,
+        help="Limits all tabs to the top N organisations ranked by number of projects.",
+    )
+
     return build_filters_dict(
         search, activity_types, countries, sme_only,
         project_status, frameworks, policy_priorities,
+        int(top_n),
     )

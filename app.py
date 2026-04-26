@@ -38,14 +38,26 @@ if "conn" not in st.session_state:
     st.stop()
 
 conn = st.session_state["conn"]
+
+if "selected_org_id" not in st.session_state:
+    st.session_state["selected_org_id"] = None
+if "selected_project_id" not in st.session_state:
+    st.session_state["selected_project_id"] = None
+
 st.sidebar.divider()
 
-# --- Filters (Task 5) ---
 from src.ui.filters import render_filters
 with st.sidebar:
     filters = render_filters(conn)
 
-# --- Tabs (Tasks 6-10) ---
+if st.session_state.get("selected_org_id"):
+    st.sidebar.divider()
+    st.sidebar.info("An organisation is selected — scroll down to view details.")
+    if st.sidebar.button("Clear selection"):
+        st.session_state["selected_org_id"] = None
+        st.session_state["selected_project_id"] = None
+        st.rerun()
+
 from src.ui.tables import render_results_table
 from src.ui.export import df_to_csv_bytes
 
@@ -103,3 +115,12 @@ with tab5:
             )
         except Exception as e:
             st.error(f"Query error: {e}")
+
+# --- Detail panel (appears below tabs when an org or project is selected) ---
+if st.session_state.get("selected_org_id"):
+    st.divider()
+    from src.ui.detail import render_org_detail, render_project_detail
+    if st.session_state.get("selected_project_id"):
+        render_project_detail(conn, st.session_state["selected_project_id"])
+    else:
+        render_org_detail(conn, st.session_state["selected_org_id"])

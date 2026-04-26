@@ -9,7 +9,8 @@ def parse_geolocation(df: pd.DataFrame) -> pd.DataFrame:
     def split_geo(val):
         if pd.isna(val) or not str(val).strip():
             return pd.NA, pd.NA
-        parts = str(val).split(",")
+        cleaned = str(val).replace('"', '').strip()
+        parts = cleaned.split(",")
         if len(parts) != 2:
             return pd.NA, pd.NA
         try:
@@ -34,8 +35,16 @@ def build_map(df: pd.DataFrame):
         size="project_count",
         hover_name="name",
         hover_data={"country": True, "project_count": True, "lat": False, "lon": False},
+        custom_data=["organisationid"],
         title="Organisation Locations",
         projection="natural earth",
+    )
+    fig.update_geos(
+        showcoastlines=True, coastlinecolor="Gray",
+        showland=True, landcolor="LightGray",
+        showocean=True, oceancolor="LightBlue",
+        showlakes=True, lakecolor="LightBlue",
+        showframe=False,
     )
     fig.update_layout(height=600)
     return fig
@@ -51,6 +60,13 @@ def render_map(conn: duckdb.DuckDBPyConnection, filters: dict) -> None:
 
     df = parse_geolocation(df)
     valid = df.dropna(subset=["lat", "lon"])
-    st.caption(f"Showing {len(valid):,} of {len(df):,} organisations with geolocation data.")
+    st.caption(
+        f"Showing {len(valid):,} of {len(df):,} organisations with geolocation data. "
+        "Click a point to inspect an organisation."
+    )
     fig = build_map(df)
-    st.plotly_chart(fig, use_container_width=True)
+    event = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="map_chart")
+    if event.selection.points:
+        org_id = event.selection.points[0]["customdata"][0]
+        st.session_state["selected_org_id"] = org_id
+        st.session_state["selected_project_id"] = None
