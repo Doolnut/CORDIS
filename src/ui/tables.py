@@ -44,7 +44,7 @@ def render_results_table(conn: duckdb.DuckDBPyConnection, filters: dict) -> pd.D
     st.caption("Click a row to inspect an organisation.")
     event = st.dataframe(
         formatted,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",

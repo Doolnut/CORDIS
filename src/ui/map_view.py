@@ -65,7 +65,7 @@ def render_map(conn: duckdb.DuckDBPyConnection, filters: dict) -> None:
         "Click a point to inspect an organisation."
     )
     fig = build_map(df)
-    event = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="map_chart")
+    event = st.plotly_chart(fig, width="stretch", on_select="rerun", key="map_chart")
     if event.selection.points:
         org_id = event.selection.points[0]["customdata"][0]
         st.session_state["selected_org_id"] = org_id

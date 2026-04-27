@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import duckdb
 from pyvis.network import Network
-import streamlit.components.v1 as components
 from src.data.queries import query_organizations
 
 
@@ -103,4 +102,4 @@ def render_network(conn: duckdb.DuckDBPyConnection, filters: dict) -> None:
         f"Nodes: top {top_n} filtered organisations by project count. "
         "Edges: organisations that co-appear in the same project (min 2 shared)."
     )
-    components.html(html, height=620, scrolling=False)
+    st.iframe(html, height=620)

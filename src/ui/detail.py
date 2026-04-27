@@ -22,11 +22,10 @@ def render_org_detail(conn: duckdb.DuckDBPyConnection, org_id: str) -> None:
 
     org = org_df.iloc[0]
 
-    col_title, col_clear = st.columns([6, 1])
-    col_title.subheader(org["name"] or "Unknown Organisation")
-    if col_clear.button("Clear", key="clear_org"):
+    if st.button("← Back to results", key="clear_org"):
         _clear()
         st.rerun()
+    st.subheader(org["name"] or "Unknown Organisation")
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Projects", int(org["project_count"]))
@@ -66,7 +65,7 @@ def render_org_detail(conn: duckdb.DuckDBPyConnection, org_id: str) -> None:
     st.caption("Click a row to view project details.")
     event = st.dataframe(
         display,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",
@@ -87,18 +86,19 @@ def render_project_detail(conn: duckdb.DuckDBPyConnection, project_id: str) -> N
 
     p = project_df.iloc[0]
 
-    col_back, col_title, col_clear = st.columns([1, 5, 1])
-    if col_back.button("Back to org", key="back_to_org"):
+    col_back, col_close = st.columns([1, 1])
+    if col_back.button("← Back to organisation", key="back_to_org"):
         st.session_state["selected_project_id"] = None
         st.rerun()
-    col_title.subheader(f"{p['acronym']} — {p['title']}")
-    if col_clear.button("Clear", key="clear_proj"):
+    if col_close.button("← Back to results", key="clear_proj"):
         _clear()
         st.rerun()
+    st.subheader(f"{p['acronym']} — {p['title']}")
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2 = st.columns(2)
     c1.metric("Status", p["status"] or "N/A")
     c2.metric("Framework", p["framework"] or "N/A")
+    c3, c4 = st.columns(2)
     c3.metric("EC Max Contribution", _fmt_euros(p["ec_max_contribution"]))
     c4.metric("Total Cost", _fmt_euros(p["total_cost"]))
 
@@ -130,7 +130,7 @@ def render_project_detail(conn: duckdb.DuckDBPyConnection, project_id: str) -> N
     st.caption("Click a row to inspect that organisation.")
     event = st.dataframe(
         display,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",

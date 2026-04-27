@@ -5,20 +5,32 @@ from typing import Any
 
 def get_filter_options(conn: duckdb.DuckDBPyConnection) -> dict[str, list]:
     countries = conn.execute(
-        "SELECT DISTINCT country FROM organization WHERE country IS NOT NULL ORDER BY country"
+        "SELECT DISTINCT country FROM org_project_base WHERE country IS NOT NULL ORDER BY country"
     ).df()["country"].tolist()
 
     activity_types = conn.execute(
-        "SELECT DISTINCT activitytype FROM organization WHERE activitytype IS NOT NULL ORDER BY activitytype"
+        "SELECT DISTINCT activitytype FROM org_project_base WHERE activitytype IS NOT NULL ORDER BY activitytype"
     ).df()["activitytype"].tolist()
 
     frameworks = conn.execute(
-        "SELECT DISTINCT frameworkprogramme FROM project WHERE frameworkprogramme IS NOT NULL ORDER BY frameworkprogramme"
-    ).df()["frameworkprogramme"].tolist()
+        "SELECT DISTINCT framework FROM org_project_base WHERE framework IS NOT NULL ORDER BY framework"
+    ).df()["framework"].tolist()
 
     statuses = conn.execute(
-        "SELECT DISTINCT status FROM project WHERE status IS NOT NULL ORDER BY status"
+        "SELECT DISTINCT status FROM org_project_base WHERE status IS NOT NULL ORDER BY status"
     ).df()["status"].tolist()
+
+    sci_voc_terms = conn.execute(
+        "SELECT DISTINCT euroscivoctitle FROM euro_sci_voc WHERE euroscivoctitle IS NOT NULL ORDER BY euroscivoctitle"
+    ).df()["euroscivoctitle"].tolist()
+
+    legal_bases = conn.execute(
+        "SELECT DISTINCT TRIM('\"' FROM title) AS title FROM legal_basis WHERE uniqueprogrammepart IS TRUE AND title IS NOT NULL ORDER BY 1"
+    ).df()["title"].tolist()
+
+    pillars = conn.execute(
+        "SELECT DISTINCT pillar FROM org_project_base WHERE pillar IS NOT NULL ORDER BY pillar"
+    ).df()["pillar"].tolist()
 
     return {
         "countries": countries,
@@ -26,6 +38,9 @@ def get_filter_options(conn: duckdb.DuckDBPyConnection) -> dict[str, list]:
         "frameworks": frameworks,
         "statuses": statuses,
         "policy_priorities": ["ai", "biodiversity", "cleanair", "climate", "digitalagenda"],
+        "sci_voc_terms": sci_voc_terms,
+        "legal_bases": legal_bases,
+        "pillars": pillars,
     }
 
 
@@ -37,63 +52,86 @@ def query_organizations(
 
     if filters.get("activity_types"):
         placeholders = ", ".join(["?" for _ in filters["activity_types"]])
-        where_clauses.append(f"o.activitytype IN ({placeholders})")
+        where_clauses.append(f"activitytype IN ({placeholders})")
         params.extend(filters["activity_types"])
 
     if filters.get("countries"):
         placeholders = ", ".join(["?" for _ in filters["countries"]])
-        where_clauses.append(f"o.country IN ({placeholders})")
+        where_clauses.append(f"country IN ({placeholders})")
         params.extend(filters["countries"])
 
     if filters.get("sme_only"):
-        where_clauses.append("o.sme = 'true'")
+        where_clauses.append("sme = 'true'")
 
     if filters.get("project_status"):
         placeholders = ", ".join(["?" for _ in filters["project_status"]])
-        where_clauses.append(f"p.status IN ({placeholders})")
+        where_clauses.append(f"status IN ({placeholders})")
         params.extend(filters["project_status"])
 
     if filters.get("frameworks"):
         placeholders = ", ".join(["?" for _ in filters["frameworks"]])
-        where_clauses.append(f"p.frameworkprogramme IN ({placeholders})")
+        where_clauses.append(f"framework IN ({placeholders})")
         params.extend(filters["frameworks"])
-
-    if filters.get("search"):
-        term = f"%{filters['search']}%"
-        where_clauses.append(
-            "(p.keywords ILIKE ? OR p.objective ILIKE ? "
-            "OR esv.euroscivoctitle ILIKE ? OR o._name ILIKE ?)"
-        )
-        params.extend([term, term, term, term])
 
     if filters.get("policy_priorities"):
         for col in filters["policy_priorities"]:
-            where_clauses.append(f"TRY_CAST(pp.{col} AS INTEGER) = 1")
+            where_clauses.append(f"has_{col} = 1")
+
+    if filters.get("search"):
+        term = f"%{filters['search']}%"
+        where_clauses.append("""(
+            name ILIKE ?
+            OR organisationid IN (
+                SELECT organisationid FROM org_search_index
+                WHERE all_keywords  ILIKE ?
+                   OR all_objectives ILIKE ?
+                   OR all_sci_voc    ILIKE ?
+            )
+        )""")
+        params.extend([term, term, term, term])
+
+    if filters.get("sci_voc_terms"):
+        conditions = " OR ".join(["all_sci_voc ILIKE ?" for _ in filters["sci_voc_terms"]])
+        where_clauses.append(
+            f"organisationid IN (SELECT organisationid FROM org_search_index WHERE {conditions})"
+        )
+        params.extend([f"%{t}%" for t in filters["sci_voc_terms"]])
+
+    if filters.get("legal_basis"):
+        placeholders = ", ".join(["?" for _ in filters["legal_basis"]])
+        where_clauses.append(f"""organisationid IN (
+            SELECT DISTINCT ob2.organisationid FROM org_project_base ob2
+            JOIN legal_basis lb
+              ON lb.projectid = TRY_CAST(REPLACE(ob2.projectid, '"', '') AS BIGINT)
+            WHERE lb.title IN ({placeholders})
+        )""")
+        params.extend(filters["legal_basis"])
+
+    if filters.get("pillar"):
+        placeholders = ", ".join(["?" for _ in filters["pillar"]])
+        where_clauses.append(f"pillar IN ({placeholders})")
+        params.extend(filters["pillar"])
 
     where_sql = " AND ".join(where_clauses)
+    limit = int(filters.get("top_n") or 500)
 
     sql = f"""
         SELECT
-            o.organisationid,
-            ANY_VALUE(o._name)             AS name,
-            ANY_VALUE(o.shortname)         AS shortName,
-            ANY_VALUE(o.activitytype)      AS activityType,
-            ANY_VALUE(o.sme)               AS SME,
-            ANY_VALUE(o.city)              AS city,
-            ANY_VALUE(o.country)           AS country,
-            ANY_VALUE(o.organizationurl)   AS organizationURL,
-            ANY_VALUE(o.contactform)       AS contactForm,
-            ANY_VALUE(o.geolocation)       AS geolocation,
-            COUNT(DISTINCT o.projectid)    AS project_count,
-            SUM(TRY_CAST(o.eccontribution AS DOUBLE)) AS total_ec_contribution
-        FROM organization o
-        JOIN project p ON p.id = o.projectid
-        LEFT JOIN euro_sci_voc esv ON esv.projectid = TRY_CAST(REPLACE(o.projectid, '"', '') AS BIGINT)
-        LEFT JOIN policy_priorities pp ON pp.projectid = TRY_CAST(REPLACE(o.projectid, '"', '') AS BIGINT)
+            organisationid,
+            ANY_VALUE(name)            AS name,
+            ANY_VALUE(activitytype)    AS activityType,
+            ANY_VALUE(sme)             AS SME,
+            ANY_VALUE(city)            AS city,
+            ANY_VALUE(country)         AS country,
+            ANY_VALUE(geolocation)     AS geolocation,
+            ANY_VALUE(organizationurl) AS organizationURL,
+            COUNT(DISTINCT projectid)  AS project_count,
+            SUM(eccontribution)        AS total_ec_contribution
+        FROM org_project_base
         WHERE {where_sql}
-        GROUP BY o.organisationid
+        GROUP BY organisationid
         ORDER BY project_count DESC
-        LIMIT {int(filters.get('top_n') or 500)}
+        LIMIT {limit}
     """
     return conn.execute(sql, params).df()
 
