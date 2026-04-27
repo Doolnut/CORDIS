@@ -8,6 +8,13 @@ def _fmt_euros(val) -> str:
     return f"€{val:,.0f}" if pd.notna(val) and val > 0 else "N/A"
 
 
+def _cell(text: str) -> None:
+    st.markdown(
+        f"<span style='font-size:13px;color:#ede7de;line-height:2'>{text}</span>",
+        unsafe_allow_html=True,
+    )
+
+
 def _clear():
     st.session_state["selected_org_id"] = None
     st.session_state["selected_project_id"] = None
@@ -56,25 +63,27 @@ def render_org_detail(conn: duckdb.DuckDBPyConnection, org_id: str) -> None:
         st.info("No projects found.")
         return
 
-    display = projects_df[
-        ["acronym", "title", "status", "start_date", "end_date", "framework", "role", "ec_contribution"]
-    ].copy()
-    display["ec_contribution"] = display["ec_contribution"].apply(_fmt_euros)
-    display.columns = ["Acronym", "Title", "Status", "Start", "End", "Framework", "Role", "EC Contribution"]
+    _HDR = ["Acronym", "Title", "Status", "Framework", "Role", "EC Contribution"]
+    _W = [1, 5, 1, 1, 1, 2]
 
-    st.caption("Click a row to view project details.")
-    event = st.dataframe(
-        display,
-        width="stretch",
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="project_table",
-    )
-    if event.selection.rows:
-        idx = event.selection.rows[0]
-        st.session_state["selected_project_id"] = projects_df.iloc[idx]["project_id"]
-        st.rerun()
+    hcols = st.columns(_W)
+    for col, label in zip(hcols, _HDR):
+        col.markdown(
+            f"<p style='font-size:11px;font-weight:600;letter-spacing:0.04em;"
+            f"text-transform:uppercase;color:#6b6258;margin:0 0 4px 0'>{label}</p>",
+            unsafe_allow_html=True,
+        )
+
+    for i, row in projects_df.iterrows():
+        rcols = st.columns(_W)
+        if rcols[0].button(row["acronym"] or "—", key=f"proj_{i}", use_container_width=True):
+            st.session_state["selected_project_id"] = row["project_id"]
+            st.rerun()
+        with rcols[1]: _cell(row.get("title") or "")
+        with rcols[2]: _cell(row.get("status") or "")
+        with rcols[3]: _cell(row.get("framework") or "")
+        with rcols[4]: _cell(row.get("role") or "")
+        with rcols[5]: _cell(_fmt_euros(row.get("ec_contribution")))
 
 
 def render_project_detail(conn: duckdb.DuckDBPyConnection, project_id: str) -> None:
@@ -123,22 +132,24 @@ def render_project_detail(conn: duckdb.DuckDBPyConnection, project_id: str) -> N
         st.info("No organisations found.")
         return
 
-    display = orgs_df[["name", "country", "type", "role", "city", "ec_contribution", "url"]].copy()
-    display["ec_contribution"] = display["ec_contribution"].apply(_fmt_euros)
-    display.columns = ["Organisation", "Country", "Type", "Role", "City", "EC Contribution", "Website"]
+    _HDR = ["Organisation", "Country", "Type", "Role", "EC Contribution"]
+    _W = [4, 1, 1, 1, 2]
 
-    st.caption("Click a row to inspect that organisation.")
-    event = st.dataframe(
-        display,
-        width="stretch",
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="partner_table",
-        column_config={"Website": st.column_config.LinkColumn("Website")},
-    )
-    if event.selection.rows:
-        idx = event.selection.rows[0]
-        st.session_state["selected_org_id"] = orgs_df.iloc[idx]["organisationid"]
-        st.session_state["selected_project_id"] = None
-        st.rerun()
+    hcols = st.columns(_W)
+    for col, label in zip(hcols, _HDR):
+        col.markdown(
+            f"<p style='font-size:11px;font-weight:600;letter-spacing:0.04em;"
+            f"text-transform:uppercase;color:#6b6258;margin:0 0 4px 0'>{label}</p>",
+            unsafe_allow_html=True,
+        )
+
+    for i, row in orgs_df.iterrows():
+        rcols = st.columns(_W)
+        if rcols[0].button(row["name"] or "(unnamed)", key=f"partner_{i}", use_container_width=True):
+            st.session_state["selected_org_id"] = row["organisationid"]
+            st.session_state["selected_project_id"] = None
+            st.rerun()
+        with rcols[1]: _cell(row.get("country") or "")
+        with rcols[2]: _cell(row.get("type") or "")
+        with rcols[3]: _cell(row.get("role") or "")
+        with rcols[4]: _cell(_fmt_euros(row.get("ec_contribution")))

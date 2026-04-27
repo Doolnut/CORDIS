@@ -70,3 +70,4 @@ def render_map(conn: duckdb.DuckDBPyConnection, filters: dict) -> None:
         org_id = event.selection.points[0]["customdata"][0]
         st.session_state["selected_org_id"] = org_id
         st.session_state["selected_project_id"] = None
+        st.rerun()
